@@ -55,7 +55,7 @@ namespace ArduinoPerfMeterGui
         }
 
         // Return number of unread mail with ID not in the previous unread ID list. FALSE otherwise.
-        public bool getNewUnreadMail() {
+        public int getNewUnreadMail() {
             int result = 0;
             return result;
         }
