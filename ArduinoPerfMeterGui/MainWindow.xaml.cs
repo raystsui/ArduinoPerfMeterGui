@@ -11,7 +11,7 @@ namespace ArduinoPerfMeterGui
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-
+    // Dummy Comment
     public partial class MainWindow : Window
     {
         private enum ProgramState
