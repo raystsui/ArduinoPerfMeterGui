@@ -1,11 +1,11 @@
 # ArduinoPerfMeterGui
-This is a C# project with simple GUI for driving a Arduino-based device with few analog meters.
+This is a C# project with q simple GUI for driving an Arduino-based device with few analog meters.
 
-The C# program gathers CPU%, FREE_RAM_MB and DISK_BUSY% performance statistics, format and send to the meter device through the virtual COM port.
+The gathers CPU%, FREE_RAM_MB and DISK_BUSY% performance statistics, format and send the numerical values to Arduino through the virtual COM port.
 
-The meter device receive float numbers plus few keywords for handshaking from the host and drive the analog meters with PWM signal.
+The Arduino receives float numbers plus few keywords for handshaking from the host and drive the analog meters with PWM signal.
 
-There are four matics in this implementation:
+There are four matrics in this implementation:
 CORE0%
 CORE1%
 RAM_FREE_MB
