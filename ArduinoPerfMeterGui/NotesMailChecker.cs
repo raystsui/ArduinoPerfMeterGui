@@ -101,7 +101,9 @@ namespace ArduinoPerfMeterGui
 
         private void CloseNotesDatabase(HANDLE hDb)
         {
-            n
+            if (hUnreadListTable != 0) { IDDestroyTable(hUnreadListTable); hUnreadListTable = 0; }
+            if (hDb != 0) { NSFDbClose(hNotesDB); hNotesDB = 0};
+            programState = ProgramState.Disconnected;
         }
 
         // Return number of unread mail.
