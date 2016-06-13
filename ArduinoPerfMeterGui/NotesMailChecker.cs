@@ -5,10 +5,11 @@ using System.Runtime.InteropServices;
 using System.Text;
 using HANDLE = System.UInt32;
 using STATUS = System.UInt16;
+using System.Collections.Generic;
 
 namespace ArduinoPerfMeterGui
 {
-    internal class NotesMailChecker
+    class NotesMailChecker
     {
         private enum ProgramState
         {
@@ -22,8 +23,12 @@ namespace ArduinoPerfMeterGui
 
         private ProgramState programState;
         private NotesSession ns;
+        private NotesDatabase db;
         private HANDLE hNotesDB;
         private HANDLE hUnreadListTable;
+        private string mailServer = "";
+        private string mailFile = "";
+        private string userName = "";
 
         [DllImport("nnotes.dll")]
         public static extern STATUS OSPathNetConstruct(string port, string server, string filename, StringBuilder retFullpathName);
@@ -62,10 +67,6 @@ namespace ArduinoPerfMeterGui
         {
             programState = ProgramState.Initializing;
             hNotesDB = OpenNotesDatabase();
-            if (hNotesDB != 0)
-            {
-                programState = ProgramState.Connected;
-            }
         }
 
         private HANDLE OpenNotesDatabase()
@@ -74,18 +75,18 @@ namespace ArduinoPerfMeterGui
 
             try
             {
-                ns = new NotesSession();
-                ns.Initialize("password");
-                string mailServer = ns.GetEnvironmentString("MailServer", true);
-                string mailFile = ns.GetEnvironmentString("MailFile", true);
-                string userName = ns.UserName;
-
-                StringBuilder fullpathName = new StringBuilder(512);
-                OSPathNetConstruct(null, mailServer, mailFile, fullpathName);
-
+                this.ns = new NotesSession();
+                this.ns.Initialize("password");
+                this.mailServer = this.ns.GetEnvironmentString("MailServer", true);
+                this.mailFile = this.ns.GetEnvironmentString("MailFile", true);
+                this.userName = this.ns.UserName;
                 Debug.WriteLine($"mailServer: {mailServer}");
                 Debug.WriteLine($"mailFile: {mailFile}");
                 Debug.WriteLine($"userName: {userName}");
+
+                this.db = this.ns.GetDatabase(mailServer, mailFile, false);
+                StringBuilder fullpathName = new StringBuilder(512);
+                OSPathNetConstruct(null, mailServer, mailFile, fullpathName);
                 Debug.WriteLine($"fullpathName: {fullpathName.ToString()}");
 
                 NSFDbOpen(fullpathName.ToString(), out hDb);
@@ -95,6 +96,10 @@ namespace ArduinoPerfMeterGui
             {
                 Debug.WriteLine($"OpenNotesDatabase: {ex.ToString()}");
             }
+            if (hDb != 0)
+            {
+                programState = ProgramState.Connected;
+            }
 
             return hDb;
         }
@@ -102,21 +107,52 @@ namespace ArduinoPerfMeterGui
         private void CloseNotesDatabase(HANDLE hDb)
         {
             if (hUnreadListTable != 0) { IDDestroyTable(hUnreadListTable); hUnreadListTable = 0; }
-            if (hDb != 0) { NSFDbClose(hNotesDB); hNotesDB = 0};
+            if (hDb != 0) { NSFDbClose(hNotesDB); hNotesDB = 0; }
             programState = ProgramState.Disconnected;
         }
 
         // Return number of unread mail.
-        public int getUnreadMail()
+        public int GetUnreadMail()
         {
-            int result = 0;
+            int result = -1;
+            bool first = true;
+            int triedReconnect = 0;
+            HANDLE id;
+
+            if (programState != ProgramState.Connected)
+            {
+                if (triedReconnect < 1)
+                {
+                    triedReconnect++;
+                    hNotesDB = OpenNotesDatabase();
+
+                }
+
+                return -1;
+
+            }
+
+            while (IDScan(hUnreadListTable, first, out id))
+            {
+                NotesDocument doc = db.GetDocumentByID(id.ToString("X"));
+                string subject = (string)((object[])doc.GetItemValue("Subject"))[0];
+                string sender = (string)((object[])doc.GetItemValue("From"))[0];
+                if (!sender.Equals(""))
+                {
+                    Debug.WriteLine($"   Doc: {subject} / *{sender}*");
+                    if (!sender.Equals(userName))
+                        result++;
+                }
+                first = false;
+            }
+
             return result;
         }
 
         // Return number of unread mail with ID not in the previous unread ID list. FALSE otherwise.
-        public int getNewUnreadMail()
+        public int GetNewUnreadMail()
         {
-            int result = 0;
+            int result = -1;
             return result;
         }
     }
