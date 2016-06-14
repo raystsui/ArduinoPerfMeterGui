@@ -8,8 +8,31 @@ using STATUS = System.UInt16;
 
 namespace ArduinoPerfMeterGui
 {
-    class NotesMailChecker
+    internal class NotesMailChecker
     {
+        private NotesDatabase db;
+
+        private HANDLE hNotesDB;
+
+        private HANDLE hUnreadListTable;
+
+        private string mailFile = "";
+
+        private string mailServer = "";
+
+        private NotesSession ns;
+
+        private ProgramState programState;
+
+        private string userName = "";
+
+        public NotesMailChecker()
+        {
+            programState = ProgramState.Start;
+
+            RaymondsInit();
+        }
+
         private enum ProgramState
         {
             Start,
@@ -19,21 +42,13 @@ namespace ArduinoPerfMeterGui
             Waiting,
             End
         }
-
-        private ProgramState programState;
-        private NotesSession ns;
-        private NotesDatabase db;
-        private HANDLE hNotesDB;
-        private HANDLE hUnreadListTable;
-        private string mailServer = "";
-        private string mailFile = "";
-        private string userName = "";
-
         [DllImport("nnotes.dll")]
-        public static extern STATUS OSPathNetConstruct(string port, string server, string filename, StringBuilder retFullpathName);
+        public static extern STATUS IDDestroyTable(HANDLE h);
 
+        //[DllImport("nnotes.d ll")]
+        //public static extern bool IDIsPresent(HANDLE hTable, DWORD id);
         [DllImport("nnotes.dll")]
-        public static extern STATUS NSFDbOpen(string path, out HANDLE phDB);
+        public static extern bool IDScan(HANDLE hTable, bool first, out HANDLE id);
 
         [DllImport("nnotes.dll")]
         public static extern STATUS NSFDbClose(HANDLE hDb);
@@ -42,30 +57,65 @@ namespace ArduinoPerfMeterGui
         public static extern STATUS NSFDbGetUnreadNoteTable(HANDLE hDb, string user, ushort namelen, bool create, out HANDLE hList);
 
         [DllImport("nnotes.dll")]
-        public static extern STATUS NSFDbUpdateUnread(HANDLE hDb, HANDLE hUnreadList);
+        public static extern STATUS NSFDbOpen(string path, out HANDLE phDB);
 
-        //[DllImport("nnotes.d ll")]
-        //public static extern bool IDIsPresent(HANDLE hTable, DWORD id);
         [DllImport("nnotes.dll")]
-        public static extern bool IDScan(HANDLE hTable, bool first, out HANDLE id);
+        public static extern STATUS NSFDbUpdateUnread(HANDLE hDb, HANDLE hUnreadList);
 
         [DllImport("nnotes.dll")]
         public static extern STATUS OSMemFree(HANDLE h);
 
         [DllImport("nnotes.dll")]
-        public static extern STATUS IDDestroyTable(HANDLE h);
-
-        public NotesMailChecker()
+        public static extern STATUS OSPathNetConstruct(string port, string server, string filename, StringBuilder retFullpathName);
+        // Return number of unread mail with ID not in the previous unread ID list. FALSE otherwise.
+        public int GetNewUnreadMail()
         {
-            programState = ProgramState.Start;
-
-            RaymondsInit();
+            int result = -1;
+            return result;
         }
 
-        private void RaymondsInit()
+        // Return number of unread mail.
+        public int GetUnreadMail()
         {
-            programState = ProgramState.Initializing;
-            hNotesDB = OpenNotesDatabase();
+            Debug.WriteLine($"[GetUnreadMail] Program status: {programState.ToString()}");
+            //int triedReconnect = 0;
+            //if (programState != ProgramState.Connected)
+            //{
+            //    if (triedReconnect < 1)
+            //    {
+            //        triedReconnect++;
+            //        hNotesDB = OpenNotesDatabase();
+
+            //    }
+            //    return -1;
+            //}
+
+            int result = 0;
+            bool first = true;
+            HANDLE id;
+            NSFDbUpdateUnread(hNotesDB, hUnreadListTable);
+            while (IDScan(hUnreadListTable, first, out id))
+            {
+                Debug.WriteLine($" trying to fetch email of ID {id.ToString("X")}");
+                NotesDocument doc = db.GetDocumentByID(id.ToString("X"));
+                string subject = (string)((object[])doc.GetItemValue("Subject"))[0];
+                string sender = (string)((object[])doc.GetItemValue("From"))[0];
+                if (!sender.Equals(""))
+                {
+                    Debug.WriteLine($"   Doc: {subject} / *{sender}*");
+                    if (!sender.Equals(userName))
+                        result++;
+                }
+                first = false;
+            }
+            return result;
+        }
+
+        private void CloseNotesDatabase(HANDLE hDb)
+        {
+            if (hUnreadListTable != 0) { IDDestroyTable(hUnreadListTable); hUnreadListTable = 0; }
+            if (hDb != 0) { NSFDbClose(hNotesDB); hNotesDB = 0; }
+            programState = ProgramState.Disconnected;
         }
 
         private HANDLE OpenNotesDatabase()
@@ -89,70 +139,27 @@ namespace ArduinoPerfMeterGui
                 Debug.WriteLine($"fullpathName: {fullpathName.ToString()}");
 
                 NSFDbOpen(fullpathName.ToString(), out hDb);
-                Debug.WriteLine($"hNotesDB: {hNotesDB.ToString()}");
+                NSFDbGetUnreadNoteTable(hDb, userName, (ushort)userName.Length, true, out hUnreadListTable);
+                Debug.WriteLine($"hDb: {hDb.ToString()}");
+                Debug.WriteLine($"hUnreadListTable: {hUnreadListTable.ToString()}");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"OpenNotesDatabase: {ex.ToString()}");
+                Debug.WriteLine($"[ERROR] OpenNotesDatabase: {ex.ToString()}");
             }
-            if (hDb != 0)
-            {
+            if (hDb != 0 && hUnreadListTable != 0)
+
                 programState = ProgramState.Connected;
-            }
+            else
+                programState = ProgramState.Disconnected;
 
             return hDb;
         }
 
-        private void CloseNotesDatabase(HANDLE hDb)
+        private void RaymondsInit()
         {
-            if (hUnreadListTable != 0) { IDDestroyTable(hUnreadListTable); hUnreadListTable = 0; }
-            if (hDb != 0) { NSFDbClose(hNotesDB); hNotesDB = 0; }
-            programState = ProgramState.Disconnected;
-        }
-
-        // Return number of unread mail.
-        public int GetUnreadMail()
-        {
-            int result = -1;
-            bool first = true;
-            int triedReconnect = 0;
-            HANDLE id;
-
-            if (programState != ProgramState.Connected)
-            {
-                if (triedReconnect < 1)
-                {
-                    triedReconnect++;
-                    hNotesDB = OpenNotesDatabase();
-
-                }
-
-                return -1;
-
-            }
-
-            while (IDScan(hUnreadListTable, first, out id))
-            {
-                NotesDocument doc = db.GetDocumentByID(id.ToString("X"));
-                string subject = (string)((object[])doc.GetItemValue("Subject"))[0];
-                string sender = (string)((object[])doc.GetItemValue("From"))[0];
-                if (!sender.Equals(""))
-                {
-                    Debug.WriteLine($"   Doc: {subject} / *{sender}*");
-                    if (!sender.Equals(userName))
-                        result++;
-                }
-                first = false;
-            }
-
-            return result;
-        }
-
-        // Return number of unread mail with ID not in the previous unread ID list. FALSE otherwise.
-        public int GetNewUnreadMail()
-        {
-            int result = -1;
-            return result;
+            programState = ProgramState.Initializing;
+            hNotesDB = OpenNotesDatabase();
         }
     }
 }
