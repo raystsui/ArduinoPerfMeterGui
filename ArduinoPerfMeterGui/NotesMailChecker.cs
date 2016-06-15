@@ -1,5 +1,6 @@
 ﻿using Domino;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -11,20 +12,14 @@ namespace ArduinoPerfMeterGui
     internal class NotesMailChecker
     {
         private NotesDatabase db;
-
         private HANDLE hNotesDB;
-
         private HANDLE hUnreadListTable;
-
         private string mailFile = "";
-
         private string mailServer = "";
-
         private NotesSession ns;
-
         private ProgramState programState;
-
         private string userName = "";
+        private List<HANDLE> unreadMailList;
 
         public NotesMailChecker()
         {
@@ -42,11 +37,10 @@ namespace ArduinoPerfMeterGui
             Waiting,
             End
         }
+
         [DllImport("nnotes.dll")]
         public static extern STATUS IDDestroyTable(HANDLE h);
 
-        //[DllImport("nnotes.d ll")]
-        //public static extern bool IDIsPresent(HANDLE hTable, DWORD id);
         [DllImport("nnotes.dll")]
         public static extern bool IDScan(HANDLE hTable, bool first, out HANDLE id);
 
@@ -67,33 +61,43 @@ namespace ArduinoPerfMeterGui
 
         [DllImport("nnotes.dll")]
         public static extern STATUS OSPathNetConstruct(string port, string server, string filename, StringBuilder retFullpathName);
-        // Return number of unread mail with ID not in the previous unread ID list. FALSE otherwise.
-        public int GetNewUnreadMail()
-        {
-            int result = -1;
-            return result;
-        }
 
         // Return number of unread mail.
         public int GetUnreadMail()
         {
+            List<HANDLE> a = GetUnreadMailList();
+            if (a == null) return -1;
+            unreadMailList = a;
+            return unreadMailList.Count;
+        }
+
+        // Return number of unread mail with ID not in the previous unread ID list. FALSE otherwise.
+        public int GetNewUnreadMail()
+        {
+            List<HANDLE> a = GetUnreadMailList();
+            if (a == null) return -1;
+            // Find the set {a}-{unreadMailList}, i.e. new unread mail.
+            List<HANDLE> b = new List<HANDLE>();
+            foreach (HANDLE id in a)
+                if (!unreadMailList.Contains(id))
+                    b.Add(id);
+            unreadMailList = a;
+            return b.Count;
+        }
+
+        // Return a List<HANDLE> of unread mail.
+        private List<HANDLE> GetUnreadMailList()
+        {
             Debug.WriteLine($"[GetUnreadMail] Program status: {programState.ToString()}");
-            //int triedReconnect = 0;
-            //if (programState != ProgramState.Connected)
-            //{
-            //    if (triedReconnect < 1)
-            //    {
-            //        triedReconnect++;
-            //        hNotesDB = OpenNotesDatabase();
+            if (programState != ProgramState.Connected)     // Retry connecting to Domino once, if not connected.
+            {
+                if (!OpenNotesDatabase()) return null;
+            }
 
-            //    }
-            //    return -1;
-            //}
-
-            int result = 0;
             bool first = true;
             HANDLE id;
             NSFDbUpdateUnread(hNotesDB, hUnreadListTable);
+            List<HANDLE> mailList = new List<HANDLE>();
             while (IDScan(hUnreadListTable, first, out id))
             {
                 Debug.WriteLine($" trying to fetch email of ID {id.ToString("X")}");
@@ -104,11 +108,11 @@ namespace ArduinoPerfMeterGui
                 {
                     Debug.WriteLine($"   Doc: {subject} / *{sender}*");
                     if (!sender.Equals(userName))
-                        result++;
+                        mailList.Add(id);
                 }
                 first = false;
             }
-            return result;
+            return mailList;
         }
 
         private void CloseNotesDatabase(HANDLE hDb)
@@ -118,7 +122,7 @@ namespace ArduinoPerfMeterGui
             programState = ProgramState.Disconnected;
         }
 
-        private HANDLE OpenNotesDatabase()
+        private bool OpenNotesDatabase()
         {
             HANDLE hDb = 0;
 
@@ -148,18 +152,23 @@ namespace ArduinoPerfMeterGui
                 Debug.WriteLine($"[ERROR] OpenNotesDatabase: {ex.ToString()}");
             }
             if (hDb != 0 && hUnreadListTable != 0)
-
+            {
                 programState = ProgramState.Connected;
+                hNotesDB = hDb; return true;
+            }
             else
+            {
                 programState = ProgramState.Disconnected;
-
-            return hDb;
+                return false;
+            }
         }
 
         private void RaymondsInit()
         {
             programState = ProgramState.Initializing;
-            hNotesDB = OpenNotesDatabase();
+            unreadMailList = new List<HANDLE>();
+            unreadMailList.Clear();
+            OpenNotesDatabase();
         }
     }
 }
