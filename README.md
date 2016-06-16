@@ -1,5 +1,5 @@
 # ArduinoPerfMeterGui
-This is a C# project with q simple GUI for driving an Arduino-based device with few analog meters.
+This is a C# project with simple GUI for driving an Arduino-based device with few analog meters.
 
 The gathers CPU%, FREE_RAM_MB and DISK_BUSY% performance statistics, format and send the numerical values to Arduino through the virtual COM port.
 
@@ -14,3 +14,6 @@ PHY1_DISK_BUSY%
 Beside RAM_FREE_MB is 'plot' in logarithm scale (calculation done in the Arduino program), other are in linear scale from 0% to 100%.
 
 Also by the Arduino program, all signal pass a digital two-pole low-pass filter for a smoother, more sensible and 'enjoyable' meter motion.
+
+[2016 June]
+Added NotesMailChecker which checks Domino for unread mail. The GUI sends "email" command to Arduino which in turn put on a notification light. 
