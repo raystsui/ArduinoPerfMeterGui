@@ -107,7 +107,7 @@ namespace ArduinoPerfMeterGui
                 if (!sender.Equals(""))
                 {
                     Debug.WriteLine($"   Doc: {subject} / *{sender}*");
-                    if (!sender.Equals(userName))
+                    // if (!sender.Equals(userName))        // To filter email sent by myself.
                         mailList.Add(id);
                 }
                 first = false;
@@ -161,6 +161,13 @@ namespace ArduinoPerfMeterGui
                 programState = ProgramState.Disconnected;
                 return false;
             }
+        }
+
+        public void clearMailList()
+        {
+            this.unreadMailList.Clear();
+
+
         }
 
         private void RaymondsInit()

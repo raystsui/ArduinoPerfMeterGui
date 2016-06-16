@@ -27,7 +27,7 @@ namespace ArduinoPerfMeterGui
         }
 
         private const float serialPortSendHz = 15;
-        private const float checkMailMinutes = 5F;
+        private const float checkMailMinutes = 3F;
         private const int freeMemCeiling = (int)65536;  // 100% FreeMEM meter deflection = 64GB RAM
         private const string handshakeMessage = "fish";
 
@@ -298,12 +298,25 @@ namespace ArduinoPerfMeterGui
             {
                 case ProgramState.SendingData:
                     programState = ProgramState.TimerStop;
-                    if (dispTimerMetrics == null) return;
-                    if (dispTimerMetrics.IsEnabled) dispTimerMetrics.Stop();
-                    if (dispTimerMailChecker == null) return;
-                    if (dispTimerMailChecker.IsEnabled) dispTimerMailChecker.Stop();
+                    if (dispTimerMetrics != null) if (dispTimerMetrics.IsEnabled) dispTimerMetrics.Stop();
+                    if (dispTimerMailChecker != null) if (dispTimerMailChecker.IsEnabled) dispTimerMailChecker.Stop();
                     break;
             }
+        }
+        private void resetMailCheck()
+        {
+            mailChecker.clearMailList();
+            mailUpdateQueued = true;
+        }
+
+        private void buCheckMail_Click(object sender, RoutedEventArgs e)
+        {
+            switch (programState)
+            {
+                case ProgramState.SendingData: resetMailCheck();  break;
+                case ProgramState.TimerStop: resetMailCheck(); startTimer(); break;
+            }
+            Debug.WriteLine($"Mail queued? {mailUpdateQueued.ToString()}");
         }
     }
 }
