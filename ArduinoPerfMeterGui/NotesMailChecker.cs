@@ -158,7 +158,7 @@ namespace ArduinoPerfMeterGui
             }
             else
             {
-                programState = ProgramState.Disconnected;
+                CloseNotesDatabase(hDb);
                 return false;
             }
         }
