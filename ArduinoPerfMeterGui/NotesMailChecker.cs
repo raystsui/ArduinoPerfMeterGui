@@ -85,7 +85,7 @@ namespace ArduinoPerfMeterGui
             return b.Count;
         }
 
-        // Return a List<HANDLE> of unread mail.
+        // Return a List<HANDLE> of unread mail. 
         private List<HANDLE> GetUnreadMailList()
         {
             Debug.WriteLine($"[GetUnreadMail] Program status: {programState.ToString()}");
@@ -158,7 +158,7 @@ namespace ArduinoPerfMeterGui
             }
             else
             {
-                programState = ProgramState.Disconnected;
+                CloseNotesDatabase(hDb);
                 return false;
             }
         }
