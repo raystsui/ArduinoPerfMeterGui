@@ -4,5 +4,6 @@
              xmlns:local="clr-namespace:ArduinoPerfMeterGui"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
+        <BitmapImage x:Key="imgMail" UriSource="/Resources/2000px-Internet-mail.svg.png"/>
     </Application.Resources>
 </Application>

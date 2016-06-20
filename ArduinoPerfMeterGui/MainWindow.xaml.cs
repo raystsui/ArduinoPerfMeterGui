@@ -27,6 +27,7 @@ namespace ArduinoPerfMeterGui
         }
 
         private const float serialPortSendHz = 15;
+        private const float checkMailMinutes = 3F;
         private const int freeMemCeiling = (int)65536;  // 100% FreeMEM meter deflection = 64GB RAM
         private const string handshakeMessage = "fish";
 
@@ -35,10 +36,11 @@ namespace ArduinoPerfMeterGui
         private List<String> allSerialPorts;
         private bool timerLock;
         private SerialPort serialPort;
-
-        private DispatcherTimer dispTimer = new DispatcherTimer(DispatcherPriority.SystemIdle);
-
+        private DispatcherTimer dispTimerMetrics = new DispatcherTimer(DispatcherPriority.Normal);
+        private DispatcherTimer dispTimerMailChecker = new DispatcherTimer(DispatcherPriority.Background);
         private ProgramState programState;
+        private NotesMailChecker mailChecker = new NotesMailChecker();
+        private bool mailUpdateQueued = false;
 
         public MainWindow()
         {
@@ -54,7 +56,8 @@ namespace ArduinoPerfMeterGui
 
         private void RaymondsExit()
         {
-            if (dispTimer.IsEnabled) dispTimer.IsEnabled = false;
+            if (dispTimerMetrics.IsEnabled) dispTimerMetrics.IsEnabled = false;
+            if (dispTimerMailChecker.IsEnabled) dispTimerMailChecker.IsEnabled = false;
             if (serialPort != null) { serialPort.Close(); }
             programState = ProgramState.End;
         }
@@ -62,7 +65,7 @@ namespace ArduinoPerfMeterGui
         private void RaymondsInit() // Init for app specific stuff
         {
             programState = ProgramState.Start;
-
+            mailUpdateQueued = false;
             InitSerialPort();
 
             // Init Performance Counters
@@ -161,6 +164,12 @@ namespace ArduinoPerfMeterGui
             return o;
         }
 
+        private void callbackQueueCheckMail(object sender, EventArgs e)
+        {
+            Debug.WriteLine("[callbackQueueCheckMail] called.");
+            mailUpdateQueued = true;
+        }
+
         private void callbackSendOutFigures(object sender, EventArgs e)
         //  public void callbackSendOutFigures(object status)
         {
@@ -174,6 +183,7 @@ namespace ArduinoPerfMeterGui
 
             try
             {
+                // Send out metrics
                 Debug.WriteLine("sync");
                 serialPort.WriteLine("sync");
                 foreach (double o in outputFigures)
@@ -183,28 +193,51 @@ namespace ArduinoPerfMeterGui
                     Debug.WriteLine(s);
                     serialPort.WriteLine(s);
                 }
+
+                // Check unread mail
+                if (mailUpdateQueued)
+                {
+                    int numMail = mailChecker.GetNewUnreadMail();
+                    if (numMail > 0)
+                    {
+                        Debug.WriteLine("email");
+                        serialPort.WriteLine("email");
+                        mailUpdateQueued = false;
+                    }
+                    else mailUpdateQueued = false;
+                }
             }
             catch (Exception ex)
             {
                 programState = ProgramState.TimerDisposed;
-                dispTimer.Stop();
-                dispTimer = null;
+                dispTimerMetrics.Stop();
+                dispTimerMetrics = null;
                 cbSerial.Items.Clear();
                 MessageBox.Show(ex.Message, "COM Port Error", MessageBoxButton.OK);
                 Debug.WriteLine($"[callbackSendOutFigures]: {ex.Message}");
             }
-
             timerLock = false;
         }
 
         private void startTimer()
         {
-            if (dispTimer == null) return;
-            if (dispTimer.IsEnabled) return;
-            dispTimer.Interval = TimeSpan.FromMilliseconds((double)1000 / serialPortSendHz);
-            dispTimer.Tick += new EventHandler(callbackSendOutFigures);
-            dispTimer.Dispatcher.Thread.Priority = ThreadPriority.Highest;
-            dispTimer.IsEnabled = true;
+            if (dispTimerMailChecker != null && !dispTimerMailChecker.IsEnabled)
+            {
+                dispTimerMailChecker.Interval = TimeSpan.FromMinutes(checkMailMinutes);
+                dispTimerMailChecker.Tick += new EventHandler(callbackQueueCheckMail);
+                dispTimerMailChecker.Dispatcher.Thread.Priority = ThreadPriority.Normal;
+                dispTimerMailChecker.IsEnabled = true;
+                mailUpdateQueued = true;    // check mail immediately before the first time timer expires (no wait).
+            }
+            if (dispTimerMetrics != null && !dispTimerMetrics.IsEnabled)
+            {
+                dispTimerMetrics.Interval = TimeSpan.FromMilliseconds((double)1000 / serialPortSendHz);
+                dispTimerMetrics.Tick += new EventHandler(callbackSendOutFigures);
+                dispTimerMetrics.Dispatcher.Thread.Priority = ThreadPriority.Normal;
+                dispTimerMetrics.IsEnabled = true;
+            }
+
+
         }
 
         private void buStart_Click(object sender, RoutedEventArgs e)
@@ -236,7 +269,8 @@ namespace ArduinoPerfMeterGui
                     break;
 
                 case ProgramState.TimerStop:
-                    dispTimer.Start();
+                    dispTimerMetrics.Start();
+                    dispTimerMailChecker.Start();
                     break;
 
                 case ProgramState.TimerDisposed:
@@ -264,10 +298,25 @@ namespace ArduinoPerfMeterGui
             {
                 case ProgramState.SendingData:
                     programState = ProgramState.TimerStop;
-                    if (dispTimer == null) return;
-                    if (dispTimer.IsEnabled) dispTimer.Stop();
+                    if (dispTimerMetrics != null) if (dispTimerMetrics.IsEnabled) dispTimerMetrics.Stop();
+                    if (dispTimerMailChecker != null) if (dispTimerMailChecker.IsEnabled) dispTimerMailChecker.Stop();
                     break;
             }
+        }
+        private void resetMailCheck()
+        {
+            mailChecker.clearMailList();
+            mailUpdateQueued = true;
+        }
+
+        private void buCheckMail_Click(object sender, RoutedEventArgs e)
+        {
+            switch (programState)
+            {
+                case ProgramState.SendingData: resetMailCheck();  break;
+                case ProgramState.TimerStop: resetMailCheck(); startTimer(); break;
+            }
+            Debug.WriteLine($"Mail queued? {mailUpdateQueued.ToString()}");
         }
     }
 }
