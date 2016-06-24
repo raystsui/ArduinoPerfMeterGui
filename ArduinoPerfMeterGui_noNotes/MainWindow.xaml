@@ -1,0 +1,17 @@
+﻿<Window
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ArduinoPerfMeterGui_noNotes"
+        xmlns:Properties="clr-namespace:ArduinoPerfMeterGui_noNotes.Properties" x:Class="ArduinoPerfMeterGui_noNotes.MainWindow"
+        mc:Ignorable="d"
+        Title="Arduino Perf. Meter" Height="105.361" Icon="1458820179_Speed.ico" SizeToContent="WidthAndHeight" HorizontalAlignment="Left" VerticalAlignment="Top" Width="276.391" ResizeMode="CanMinimize">
+    <Grid>
+        <ComboBox x:Name="cbSerial" HorizontalAlignment="Left" Height="19" Margin="82,17,0,0" VerticalAlignment="Top" Width="76" />
+        <Label x:Name="label" Content="Meter Port" HorizontalAlignment="Left" Margin="10,13,0,0" VerticalAlignment="Top" />
+        <Button x:Name="buStart" Content="Start" HorizontalAlignment="Left" Margin="163,17,0,10" Width="47" Click="buStart_Click" Grid.ColumnSpan="3" Height="47" />
+        <Button x:Name="buExit" Content="Exit" HorizontalAlignment="Left" VerticalAlignment="Top" Width="76" Click="buExit_Click" Height="25" Margin="82,41,0,0" />
+        <Button x:Name="buStop" Content="Stop" HorizontalAlignment="Left" Margin="215,17,0,10" Width="47" Click="buStop_Click" Grid.ColumnSpan="3" Height="47" />
+    </Grid>
+</Window>
